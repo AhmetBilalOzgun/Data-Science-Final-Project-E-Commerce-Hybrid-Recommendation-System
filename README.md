@@ -4,7 +4,7 @@
 ## Proje Ekibi
 | Öğrenci No | Ad Soyad |
 |------------|----------|
-| [ÖĞRENME NUMARASI] | Ahmet Bilal Özgün |
+| 1306240133 | Ahmet Bilal Özgün |
 
 ---
 
