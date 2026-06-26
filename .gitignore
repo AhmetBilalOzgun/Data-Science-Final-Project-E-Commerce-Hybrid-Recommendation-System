@@ -220,6 +220,7 @@ __marimo__/
 # Project-specific
 data/raw/
 data/processed/
+data/cb_embeddings.npy
 .DS_Store
 report/*.docx
 report/*.tex

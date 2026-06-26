@@ -44,18 +44,20 @@
 - [x] Write RQ2 answer with RMSE improvement % — template written; fill X/Y/Z after running notebook
 
 ## Phase 6 — RQ3: Content-Based Filtering (sentence-transformers + FAISS)
-- [ ] Build product metadata string per product_id: `category + " " + price_bucket + " " + weight_bucket`
-- [ ] Load `SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")`
-- [ ] Encode all product metadata → 384-dim vectors, L2-normalize
-- [ ] Build `faiss.IndexFlatIP`, add normalized vectors
-- [ ] Add row-loss log after each merge in Cell 7 for the report (how many rows dropped by inner joins)
-- [ ] Verify: self-query cosine similarity == 1.0
-- [ ] Query top-5 similar products for 5 sample products
-- [ ] Demo free-text semantic search (e.g. "presente leve para crianças")
-- [ ] Build co-purchase ground truth from `df_items` (products in same order)
-- [ ] Compute overlap@5 for top-50 products by order volume
-- [ ] Display recommendation table for 3 example products
-- [ ] Write RQ3 answer
+- [x] Build product metadata string per product_id: `category + " " + price_bucket + " " + weight_bucket`
+- [x] Load `SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")`
+- [x] Encode all product metadata → 384-dim vectors, L2-normalize
+- [x] Cache CB embeddings at `data/cb_embeddings.npy`
+- [x] Build `faiss.IndexFlatIP`, add normalized vectors
+- [x] Add row-loss log after each merge in Cell 7 for the report (how many rows dropped by inner joins)
+- [x] Verify: self-query cosine similarity == 1.0
+- [x] Query top-5 similar products for 5 sample products
+- [x] Demo free-text semantic search (e.g. "presente leve para crianças")
+- [x] Build co-purchase ground truth from `df_items` (products in same order)
+- [x] Compute overlap@5 for top-50 products by order volume
+- [x] Display recommendation table for 3 example products
+- [x] Build category-level mean embeddings for Phase 7 hybrid scoring
+- [x] Write RQ3 answer
 
 ## Phase 7 — Hybrid Demo
 - [ ] Normalize CF predicted ratings: `(score - 1) / 4` → [0, 1]
