@@ -41,7 +41,7 @@
 - [x] Fit `NormalPredictor` baseline, compare RMSE — replaced by global-mean baseline (`trainset.global_mean`)
 - [x] Assert SVD RMSE < NormalPredictor RMSE AND < 1.5 — replaced by conditional print warnings (notebook stays runnable if SVD loses)
 - [x] Generate top-5 category recommendations for 3 sample customers
-- [x] Write RQ2 answer with RMSE improvement % — template written; fill X/Y/Z after running notebook
+- [x] Write RQ2 answer with RMSE improvement % — filled with executed notebook results
 
 ## Phase 6 — RQ3: Content-Based Filtering (sentence-transformers + FAISS)
 - [x] Build product metadata string per product_id: `category + " " + price_bucket + " " + weight_bucket`
@@ -75,16 +75,16 @@
 - [x] Export to PDF → `report/report.pdf`
 
 ## Phase 9 — Final Polish & Submission
-- [ ] `prompts.md`: log 10–15 Claude prompts used, chronological, with phase labels
-- [ ] `README.md`: student info (student number, name), setup instructions, libraries, data source + license
-- [ ] `requirements.txt`: freeze exact versions (`uv pip freeze`)
-- [ ] Kernel > Restart & Run All — zero errors, all 5 figures render
+- [x] `prompts.md`: log 10–15 Claude prompts used, chronological, with phase labels
+- [x] `README.md`: student info (student number, name), setup instructions, libraries, data source + license
+- [x] `requirements.txt`: freeze exact versions (`uv pip freeze`)
+- [x] Kernel > Restart & Run All — zero errors, all 5 figures render
 - [ ] Push to GitHub, verify all files visible
 - [ ] Submit GitHub URL by 2026-07-03, 12:30
 
 ## Submission Requirements Checklist
-- [ ] notebook.ipynb: data loading/cleaning ✓ EDA 4+ viz types ✓ 3+ RQs answered ✓ ML model ✓ interpretation ✓
-- [ ] report/report.pdf (3–5 pages)
-- [ ] prompts.md (10–15 prompts)
-- [ ] README.md
+- [x] notebook.ipynb: data loading/cleaning ✓ EDA 4+ viz types ✓ 3+ RQs answered ✓ ML model ✓ interpretation ✓
+- [x] report/report.pdf (3–5 pages)
+- [x] prompts.md (10–15 prompts)
+- [x] README.md
 - [ ] GitHub repository

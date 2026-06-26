@@ -82,17 +82,21 @@ Kernel → **Restart & Run All** ile tüm hücreleri çalıştır.
 
 ## Kullanılan Kütüphaneler
 
+Tam ortam kilidi için `requirements.txt` dosyasındaki exact version pinleri kullanılmalıdır. Ana kütüphaneler:
+
 | Kütüphane | Versiyon | Kullanım |
 |-----------|----------|----------|
-| pandas | ≥2.0 | Veri yükleme ve işleme |
-| numpy | ≥2.0 | Sayısal hesaplamalar |
-| matplotlib | ≥3.9 | Görselleştirme |
-| seaborn | ≥0.13 | İstatistiksel görselleştirme |
-| scikit-learn | ≥1.9 | Ön işleme |
-| scipy | ≥1.18 | İstatistiksel testler (Mann-Whitney U) |
-| scikit-surprise | ≥1.1 | SVD collaborative filtering |
-| faiss-cpu | ≥1.14 | Vektör benzerlik indeksi |
-| sentence-transformers | ≥3.0 | Çok dilli anlamsal gömme |
+| pandas | 3.0.1 | Veri yükleme ve işleme |
+| numpy | 2.4.3 | Sayısal hesaplamalar |
+| matplotlib | 3.11.0 | Görselleştirme |
+| seaborn | 0.13.2 | İstatistiksel görselleştirme |
+| scikit-learn | 1.9.0 | Ön işleme |
+| scipy | 1.18.0 | İstatistiksel testler (Mann-Whitney U) |
+| scikit-surprise | 1.1.5 | SVD collaborative filtering |
+| faiss-cpu | 1.14.3 | Vektör benzerlik indeksi |
+| sentence-transformers | 5.6.0 | Çok dilli anlamsal gömme |
+| jupyterlab | 4.5.6 | Notebook çalıştırma |
+| reportlab | 5.0.0 | PDF rapor üretimi |
 
 ---
 
