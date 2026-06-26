@@ -60,11 +60,11 @@
 - [x] Write RQ3 answer
 
 ## Phase 7 — Hybrid Demo
-- [ ] Normalize CF predicted ratings: `(score - 1) / 4` → [0, 1]
-- [ ] CB cosine score already in [0, 1]
-- [ ] `hybrid_score = 0.6 * cf_normalized + 0.4 * cb_cosine`
-- [ ] Demo hybrid recommendations for 3 customers
-- [ ] Explain α=0.6 choice (user behavior > content metadata)
+- [x] Normalize CF predicted ratings: `(score - 1) / 4` → [0, 1]
+- [x] CB cosine score already in [0, 1]
+- [x] `hybrid_score = 0.6 * cf_normalized + 0.4 * cb_cosine`
+- [x] Demo hybrid recommendations for 3 customers
+- [x] Explain α=0.6 choice (user behavior > content metadata)
 
 ## Phase 8 — Report (PDF, 3–5 pages)
 - [ ] Section 1: Introduction & motivation (0.5 pp)
