@@ -8,3 +8,4 @@ scikit-surprise>=1.1
 faiss-cpu>=1.14
 sentence-transformers>=3.0
 jupyterlab>=4.0
+reportlab>=4.0

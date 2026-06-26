@@ -67,12 +67,12 @@
 - [x] Explain α=0.6 choice (user behavior > content metadata)
 
 ## Phase 8 — Report (PDF, 3–5 pages)
-- [ ] Section 1: Introduction & motivation (0.5 pp)
-- [ ] Section 2: Dataset description & cleaning decisions (1 pp)
-- [ ] Section 3: Methods — CF and CB approaches (1 pp)
-- [ ] Section 4: Results — answer each RQ with key figures (1.5 pp)
-- [ ] Section 5: Conclusions & limitations (0.5 pp)
-- [ ] Export to PDF → `report/report.pdf`
+- [x] Section 1: Introduction & motivation (0.5 pp)
+- [x] Section 2: Dataset description & cleaning decisions (1 pp)
+- [x] Section 3: Methods — CF and CB approaches (1 pp)
+- [x] Section 4: Results — answer each RQ with key figures (1.5 pp)
+- [x] Section 5: Conclusions & limitations (0.5 pp)
+- [x] Export to PDF → `report/report.pdf`
 
 ## Phase 9 — Final Polish & Submission
 - [ ] `prompts.md`: log 10–15 Claude prompts used, chronological, with phase labels
