@@ -79,7 +79,7 @@
 - [x] `README.md`: student info (student number, name), setup instructions, libraries, data source + license
 - [x] `requirements.txt`: freeze exact versions (`uv pip freeze`)
 - [x] Kernel > Restart & Run All — zero errors, all 5 figures render
-- [ ] Push to GitHub, verify all files visible
+- [x] Push to GitHub, verify all files visible
 - [ ] Submit GitHub URL by 2026-07-03, 12:30
 
 ## Submission Requirements Checklist
@@ -87,4 +87,4 @@
 - [x] report/report.pdf (3–5 pages)
 - [x] prompts.md (10–15 prompts)
 - [x] README.md
-- [ ] GitHub repository
+- [x] GitHub repository
