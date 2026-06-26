@@ -1,0 +1,10 @@
+pandas>=2.0
+numpy>=2.0
+matplotlib>=3.9
+seaborn>=0.13
+scikit-learn>=1.9
+scipy>=1.18
+scikit-surprise>=1.1
+faiss-cpu>=1.14
+sentence-transformers>=3.0
+jupyterlab>=4.0
