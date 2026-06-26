@@ -38,6 +38,7 @@ customer_id × category matrix         sentence-transformer embeddings
 | order_payments | order_id, payment_value |
 | sellers | seller_id, seller_state |
 | geolocation | geolocation_zip_code_prefix, geolocation_lat, geolocation_lng, geolocation_state |
+| product_category_name_translation | product_category_name (PT), product_category_name_english |
 
 **Filter**: `order_status == "delivered"` — removes cancelled, unavailable, in-transit orders.
 

@@ -1,41 +1,42 @@
 # Final Project — Task Checklist
 
 ## Phase 1 — Setup
-- [ ] Download Olist dataset from Kaggle → place 8 CSVs in `data/raw/`
-- [ ] Install deps: `uv pip install scikit-learn scipy matplotlib seaborn scikit-surprise faiss-cpu sentence-transformers --python /Users/ahmetbilalozgun/Documents/Projects/Dersler/veribilimi/.venv/bin/python3`
-- [ ] Verify all imports work in a test cell
-- [ ] Create `.gitignore` (ignore `data/raw/` if CSVs >50MB, ignore `.venv/`, `__pycache__/`, `.ipynb_checkpoints/`)
-- [ ] Create `requirements.txt`
+- [x] Download Olist dataset from Kaggle → place 8 CSVs in `data/raw/`
+- [x] Install deps: `uv pip install scikit-learn scipy matplotlib seaborn scikit-surprise faiss-cpu sentence-transformers --python /Users/ahmetbilalozgun/Documents/Projects/Dersler/veribilimi/.venv/bin/python3`
+- [x] Verify all imports work in a test cell
+- [x] Create `.gitignore` (ignore `data/raw/` if CSVs >50MB, ignore `.venv/`, `__pycache__/`, `.ipynb_checkpoints/`)
+- [x] Create `requirements.txt`
 
 ## Phase 2 — Data Loading & Cleaning
-- [ ] Load all 8 CSVs with correct dtypes and date parsing (`order_purchase_timestamp` → datetime)
-- [ ] Filter to `order_status == "delivered"` only
-- [ ] Handle nulls: `product_category_name` (drop rows), `product_description_lenght` (fill with 0)
-- [ ] Join orders → order_items → products → customers → reviews → `df_master`
-- [ ] Verify: `df_orders.shape[0] > 90_000`, no full-null columns
-- [ ] Add price bucket and weight bucket columns to `df_products`
+- [x] Load all 8 CSVs with correct dtypes and date parsing (`order_purchase_timestamp` → datetime)
+- [x] Filter to `order_status == "delivered"` only
+- [x] Handle nulls: `product_category_name` (drop rows), `product_description_lenght` (fill with 0)
+- [x] Join orders → order_items → products → customers → reviews → `df_master`
+- [x] Verify: `df_orders.shape[0] > 90_000`, no full-null columns
+- [x] Add price bucket and weight bucket columns to `df_products`
 
 ## Phase 3 — EDA (5 visualization types)
-- [ ] 3.1 Line chart: monthly order volume over time
-- [ ] 3.2 Horizontal bar: top-15 product categories by order count
-- [ ] 3.3 Histogram + KDE: review score distribution
-- [ ] 3.4 Box plot: payment_value grouped by review_score (1–5)
-- [ ] 3.5 Bar/scatter: customer count by Brazilian state
-- [ ] Add markdown interpretation cell after each viz
+- [x] 3.1 Line chart: monthly order volume over time
+- [x] 3.2 Horizontal bar: top-15 product categories by order count
+- [x] 3.3 Histogram + KDE: review score distribution
+- [x] 3.4 Box plot: payment_value grouped by review_score (1–5)
+- [x] 3.5 Bar/scatter: customer count by Brazilian state
+- [x] Add markdown interpretation cell after each viz
 
 ## Phase 4 — RQ1: Regional Rating Bias
-- [ ] Derive `is_multi_category` flag per customer (bought from 2+ categories → True)
-- [ ] Join with `customer_state` from `df_customers`
-- [ ] Compute mean review score by (buyer_type × state)
-- [ ] Violin/box plot: top-5 states, split by buyer type
-- [ ] Mann-Whitney U test (`scipy.stats.mannwhitneyu`)
-- [ ] Write 3–5 sentence answer to RQ1
+- [x] Derive `is_multi_category` flag per `customer_unique_id` (bought from 2+ categories → True; NOTE: use `customer_unique_id`, not `customer_id` — Olist `customer_id` is order-scoped)
+- [x] Join with `customer_state` from `df_customers`
+- [x] Compute mean review score by (buyer_type × state)
+- [x] Violin/box plot: top-5 states, split by buyer type
+- [x] Mann-Whitney U test (`scipy.stats.mannwhitneyu`)
+- [x] Write 3–5 sentence answer to RQ1
 
 ## Phase 5 — RQ2: Collaborative Filtering (SVD)
 - [ ] Build user-item DataFrame: `(customer_id, product_category_name, mean_review_score)`
 - [ ] `surprise.Dataset.load_from_df()` with `Reader(rating_scale=(1, 5))`
 - [ ] `train_test_split(test_size=0.2, random_state=42)`
 - [ ] Fit `SVD(n_factors=100, n_epochs=20, random_state=42)`
+- [ ] Use temporal train/test split: train on orders before ~2018-01 (use `order_purchase_timestamp` from df_master), test on 2018-01+ — prevents future-review leakage into training (random split is incorrect for recommenders)
 - [ ] `cross_validate(SVD, data, cv=5)` → print RMSE/MAE table
 - [ ] Fit `NormalPredictor` baseline, compare RMSE
 - [ ] Assert SVD RMSE < NormalPredictor RMSE AND < 1.5
@@ -47,6 +48,7 @@
 - [ ] Load `SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")`
 - [ ] Encode all product metadata → 384-dim vectors, L2-normalize
 - [ ] Build `faiss.IndexFlatIP`, add normalized vectors
+- [ ] Add row-loss log after each merge in Cell 7 for the report (how many rows dropped by inner joins)
 - [ ] Verify: self-query cosine similarity == 1.0
 - [ ] Query top-5 similar products for 5 sample products
 - [ ] Demo free-text semantic search (e.g. "presente leve para crianças")
