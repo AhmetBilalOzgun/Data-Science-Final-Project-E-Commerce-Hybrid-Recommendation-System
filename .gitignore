@@ -226,3 +226,4 @@ report/*.docx
 report/*.tex
 report/*.aux
 report/*.log
+tmp/

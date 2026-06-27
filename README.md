@@ -1,124 +1,126 @@
 # E-Commerce Recommendation System
-### Veri Bilimi Final Projesi — 2025/2026 Bahar Dönemi
+### Data Science Final Project — 2025/2026 Spring Semester
 
-## Proje Ekibi
-| Öğrenci No | Ad Soyad |
-|------------|----------|
+## Project Team
+| Student ID | Name |
+|------------|------|
 | 1306240133 | Ahmet Bilal Özgün |
 
 ---
 
-## Proje Özeti
+## Project Summary
 
-Olist Brezilya E-Ticaret veri seti üzerinde hibrit ürün öneri sistemi. İki yöntemi birleştirir:
+A hybrid product recommendation system built on the UCI Online Retail dataset (implicit-purchase recommender). Combines two approaches:
 
-- **Collaborative Filtering**: Kullanıcı-ürün matrisi üzerinde SVD (matris çarpanlara ayırma) ile kişisel tercih tahmini
-- **Content-Based Filtering**: Çok dilli cümle gömme modeli (`paraphrase-multilingual-MiniLM-L12-v2`) ve FAISS vektör arama indeksi ile anlamsal ürün benzerliği ve serbest metin araması
-- **Hibrit**: `0.6 × CF + 0.4 × CB` ağırlıklı birleşim
+- **Collaborative Filtering**: SVD on purchase-frequency synthetic ratings (scikit-surprise), `customer_id × product_id` matrix
+- **Content-Based Filtering**: Semantic product similarity via English sentence embeddings (`all-MiniLM-L6-v2`) and FAISS vector search index
+- **Hybrid**: `0.4 × CF_normalized + 0.6 × CB_cosine` weighted blend; already-purchased products are excluded
 
-### Araştırma Soruları
-1. Çok kategorili alıcılar, bölgeye göre ürünleri farklı mı değerlendiriyor?
-2. SVD matris çarpanları küresel ortalama tabanına kıyasla ne kadar iyileşme sağlıyor?
-3. Anlamsal öneriler gerçek birlikte satın alımlarla ne ölçüde örtüşüyor?
-
----
-
-## Veri Kaynağı
-
-**Brazilian E-Commerce Public Dataset by Olist**
-- Kaynak: [Kaggle — Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
-- Lisans: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
-- 8 CSV dosyası, ~100k sipariş, 2016–2018
-
-> Veri dosyaları lisans kısıtları nedeniyle repoya dahil edilmemiştir. Aşağıdaki kurulum adımlarına bakınız.
+### Research Questions
+1. Do loyal customers (≥3 invoices) show higher product diversity per invoice than occasional buyers? (Mann-Whitney U + diversity_rate)
+2. How much does SVD improve over a global-mean baseline? (temporal split, warm-user focus)
+3. Are sentence-transformer embeddings semantically coherent, and does the hybrid blend CF and CB signals? (cosine similarity + Jaccard@5)
 
 ---
 
-## Kurulum ve Çalıştırma
+## Dataset
 
-### 1. Repoyu klonla
+**UCI Online Retail Dataset**
+- Source: [UC Irvine Machine Learning Repository](https://archive.ics.uci.edu/dataset/352/online+retail)
+- License: Open/Public (UCI Archive)
+- Single CSV file, 541,909 rows, December 2010 – December 2011
+- Post-cleaning: 396,046 rows | 4,334 customers | 3,658 products | 18,401 invoices
+
+> The data file is not included in the repository due to size. See setup steps below.
+
+---
+
+## Setup
+
+### 1. Clone the repository
 ```bash
 git clone <repo-url>
 cd finalProject
 ```
 
-### 2. Sanal ortamı oluştur
+### 2. Create a virtual environment
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 ```
 
-### 3. Bağımlılıkları yükle
+### 3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-> **Not:** `sentence-transformers` PyTorch'u (~800MB) gerektirir. İlk kurulum zaman alabilir.
-> `paraphrase-multilingual-MiniLM-L12-v2` modeli (~471MB) ilk çalıştırmada otomatik indirilir.
+> **Note:** `sentence-transformers` requires PyTorch (~800 MB). First install may take a while.
+> The `all-MiniLM-L6-v2` model (~90 MB) is downloaded automatically on first run.
 
-### 4. Veriyi indir
-[Kaggle](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) sayfasından 8 CSV dosyasını indirip `data/raw/` klasörüne koy:
+### 4. Download the data
+Download `Online Retail.xlsx` from [UCI Archive](https://archive.ics.uci.edu/dataset/352/online+retail), convert to CSV, and place in `data/raw/`:
+
+```python
+import pandas as pd
+df = pd.read_excel("Online Retail.xlsx")
+df.to_csv("data/raw/Online_Retail.csv", index=False)
+```
 
 ```
 data/raw/
-├── olist_orders_dataset.csv
-├── olist_order_items_dataset.csv
-├── olist_products_dataset.csv
-├── olist_customers_dataset.csv
-├── olist_order_reviews_dataset.csv
-├── olist_order_payments_dataset.csv
-├── olist_sellers_dataset.csv
-└── olist_geolocation_dataset.csv
+└── Online_Retail.csv    ← 45.8 MB, 541,909 rows
 ```
 
-### 5. Notebook'u çalıştır
+### 5. Run the notebook
 ```bash
 jupyter lab notebook.ipynb
 ```
 
-Kernel → **Restart & Run All** ile tüm hücreleri çalıştır.
+Use Kernel → **Restart & Run All** to execute all cells.  
+On first run, `data/cb_embeddings.npy` is generated (~2 min). Subsequent runs load from cache.
 
 ---
 
-## Kullanılan Kütüphaneler
+## Libraries
 
-Tam ortam kilidi için `requirements.txt` dosyasındaki exact version pinleri kullanılmalıdır. Ana kütüphaneler:
+For exact reproducibility, use the pinned versions in `requirements.txt`. Key packages:
 
-| Kütüphane | Versiyon | Kullanım |
-|-----------|----------|----------|
-| pandas | 3.0.1 | Veri yükleme ve işleme |
-| numpy | 2.4.3 | Sayısal hesaplamalar |
-| matplotlib | 3.11.0 | Görselleştirme |
-| seaborn | 0.13.2 | İstatistiksel görselleştirme |
-| scikit-learn | 1.9.0 | Ön işleme |
-| scipy | 1.18.0 | İstatistiksel testler (Mann-Whitney U) |
+| Library | Version | Purpose |
+|---------|---------|---------|
+| pandas | 3.0.1 | Data loading and processing |
+| numpy | 2.4.3 | Numerical computations |
+| matplotlib | 3.11.0 | Visualization |
+| seaborn | 0.13.2 | Statistical visualization |
+| scipy | 1.18.0 | Statistical tests (Mann-Whitney U) |
 | scikit-surprise | 1.1.5 | SVD collaborative filtering |
-| faiss-cpu | 1.14.3 | Vektör benzerlik indeksi |
-| sentence-transformers | 5.6.0 | Çok dilli anlamsal gömme |
-| jupyterlab | 4.5.6 | Notebook çalıştırma |
-| reportlab | 5.0.0 | PDF rapor üretimi |
+| faiss-cpu | 1.14.3 | Vector similarity index |
+| sentence-transformers | 5.6.0 | Semantic embeddings (all-MiniLM-L6-v2) |
+| jupyterlab | 4.5.6 | Notebook execution |
+| reportlab | 5.0.0 | PDF report generation |
 
 ---
 
-## Proje Yapısı
+## Project Structure
 
 ```
 finalProject/
 ├── README.md
-├── CLAUDE.md           # AI geliştirme ortamı bağlamı
-├── todos.md            # Görev takip listesi
-├── design.md           # Mimari ve tasarım kararları
-├── notebook.ipynb      # Ana teslim dosyası
-├── prompts.md          # AI prompt günlüğü
-├── requirements.txt    # Bağımlılıklar
+├── CLAUDE.md                    # AI development environment context
+├── todos.md                     # Task tracking list
+├── design.md                    # Architecture and design decisions
+├── notebook.ipynb               # Main deliverable
+├── prompts.md                   # AI prompt log
+├── requirements.txt             # Dependencies
 ├── data/
-│   └── raw/            # Olist CSV dosyaları (gitignore'd)
+│   ├── raw/Online_Retail.csv    # UCI dataset (gitignored)
+│   └── cb_embeddings.npy        # Embedding cache (generated on first run)
 └── report/
-    └── report.pdf      # Kısa rapor (3-5 sayfa)
+    ├── report.pdf               # Short report (3–5 pages)
+    └── build_report.py          # Report generation script
 ```
 
 ---
 
-## Teslim Tarihi
+## Deadline
 
-**3 Temmuz 2026, saat 12:30**
+**July 3, 2026 at 12:30**

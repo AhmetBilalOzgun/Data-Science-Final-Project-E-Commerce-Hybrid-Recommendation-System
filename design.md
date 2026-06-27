@@ -1,46 +1,73 @@
 # Design Document — E-Commerce Hybrid Recommendation System
 
+## Dataset Switch Rationale
+
+**Original dataset**: Olist Brazilian E-Commerce (8 CSVs)  
+**Switched to**: UCI Online Retail (single CSV, 541,909 rows)
+
+**Why the switch**: Olist had 98.62% sparsity, average 1.01 interactions per user, and 100% cold-start
+test users — SVD produced only +0.2% RMSE over the global mean, indistinguishable from noise.
+UCI Online Retail has avg 4.25 invoices per customer and 71.8% warm test users, enabling SVD to learn
+real latent factors. Final SVD lift: **+2.6% RMSE** over global mean for warm users (vs 0% on Olist).
+
+**Framing change**: No explicit star ratings in UCI. This is now an **implicit-purchase recommender**:
+rating proxy = purchase frequency (log1p + min-max scaled to [1,5]) computed *within each temporal
+window* to prevent future-leakage into training labels.
+
+---
+
 ## Architecture Overview
 
 ```
-Olist Dataset (8 CSVs)
+Online_Retail.csv (UCI)
         │
         ▼
- Data Loading & Cleaning
+ Phase 2: Load + Clean
+ ├── Drop null CustomerID (135k rows, anonymous guests)
+ ├── Cast CustomerID float→str (Excel artifact)
+ ├── Drop cancelled invoices (InvoiceNo starts with 'C')
+ ├── Drop Quantity ≤ 0 and UnitPrice ≤ 0
+ ├── Filter non-product StockCodes (regex ^[0-9]{5}[A-Za-z]?$)
+ └── Aggregate: modal Description + median UnitPrice per StockCode
+        │ df_master (~396k rows, 4334 users, 3658 products)
         │
         ├─────────────────────────────────────────┐
         ▼                                         ▼
 Collaborative Filtering (CF)          Content-Based Filtering (CB)
-customer_id × category matrix         sentence-transformer embeddings
-      SVD (matrix factorization)             FAISS IndexFlatIP
-      top-N category predictions             semantic similarity search
+customer_id × product_id matrix       sentence-transformer embeddings
+Temporal split: cutoff 2011-10-01     all-MiniLM-L6-v2, 384-dim
+Rating: log1p(InvoiceNo.nuniq)        Feature: "{description} {price_bucket}"
+        per window (no leakage)       FAISS IndexFlatIP (cosine on L2-norm)
+SVD(n_factors=100, n_epochs=20)       Item-level index (one embed per StockCode)
         │                                         │
         └──────────────┬──────────────────────────┘
                        ▼
               Hybrid Score
        0.6 × CF_normalized + 0.4 × CB_cosine
+       (exclude already-purchased products)
 ```
 
 ---
 
 ## Dataset
 
-**Source**: Brazilian E-Commerce Public Dataset by Olist (Kaggle, CC BY-NC-SA 4.0)
-**Tables & key columns used**:
+**Source**: UCI Online Retail Dataset (UC Irvine Machine Learning Repository, 2015)  
+**URL**: https://archive.ics.uci.edu/dataset/352/online+retail  
+**License**: Open/Public (UCI Machine Learning Repository)  
+**File**: `data/raw/Online_Retail.csv` (45.8MB, converted from .xlsx)
 
-| Table | Key columns |
-|-------|-------------|
-| orders | order_id, customer_id, order_status, order_purchase_timestamp |
-| order_items | order_id, product_id, price, freight_value |
-| products | product_id, product_category_name, product_description_lenght, product_weight_g |
-| customers | customer_id, customer_state |
-| order_reviews | order_id, review_score |
-| order_payments | order_id, payment_value |
-| sellers | seller_id, seller_state |
-| geolocation | geolocation_zip_code_prefix, geolocation_lat, geolocation_lng, geolocation_state |
-| product_category_name_translation | product_category_name (PT), product_category_name_english |
+| Column | Role | Notes |
+|--------|------|-------|
+| CustomerID | CF user axis | float64 in CSV → cast int→str |
+| StockCode | CF/CB item axis | regex filter removes service codes |
+| Description | CB feature text | modal per StockCode (varies across invoices) |
+| InvoiceDate | Temporal split | datetime, cutoff 2011-10-01 |
+| InvoiceNo | Purchase event ID | prefix 'C' = cancellation, drop |
+| Quantity | Item count | drop ≤ 0 (returns/corrections) |
+| UnitPrice | Item price (£) | drop ≤ 0; median per product → price_bucket |
+| Country | EDA segmentation | 91% UK customers |
 
-**Filter**: `order_status == "delivered"` — removes cancelled, unavailable, in-transit orders.
+**Post-cleaning stats**: 396,046 rows | 4,334 customers | 3,658 products | 18,401 invoices | 37 countries
 
 ---
 
@@ -48,46 +75,56 @@ customer_id × category matrix         sentence-transformer embeddings
 
 | Dimension | Choice | Reason |
 |-----------|--------|--------|
-| Rows | customer_id | ~100k unique customers |
-| Columns | product_category_name | ~70 categories — dense enough for SVD (vs product_id which is too sparse) |
-| Values | mean(review_score) per (customer, category) | Proxy for preference intensity |
-| Rating scale | 1–5 | Native Olist review scale |
+| Rows | customer_id | 4,334 unique customers |
+| Columns | product_id (StockCode) | 3,658 items — item-level personalization |
+| Values | synthetic_rating (see below) | No explicit ratings; use purchase frequency |
+| Rating scale | 1–5 | Compatible with surprise Reader(rating_scale=(1,5)) |
 
-**Sparsity note**: Most Olist customers have exactly 1 order. CF will be sparse; cold-start customers fall back to CB component.
+**Rating synthesis** (within-window, no leakage):
+```python
+freq = df_train.groupby(["customer_id","product_id"])["invoice_no"].nunique()
+log_freq = np.log1p(freq)
+synthetic_rating = 1 + 4 * (log_freq - log_freq.min()) / (log_freq.max() - log_freq.min())
+synthetic_rating = synthetic_rating.clip(1, 5)
+```
+Applied separately to train and test windows. A rating of 2.3 means "moderate repurchase frequency
+relative to the training distribution", not "2.3 stars".
+
+**Sparsity**: train 98.5%, test 98.6% — typical for retail implicit feedback data.
 
 ---
 
 ## Collaborative Filtering — SVD
 
-**Library**: scikit-surprise
+**Library**: scikit-surprise  
 **Algorithm**: Simon Funk SVD (regularized matrix factorization)
 
-**Hyperparameters** (academic scope — defaults sufficient):
+**Hyperparameters**:
 ```python
-SVD(n_factors=100, n_epochs=20, lr_all=0.005, reg_all=0.02, random_state=42)
+SVD(n_factors=100, n_epochs=20, random_state=42)
 ```
 
 **Evaluation**:
-- 5-fold cross-validation (`cross_validate(cv=5)`) → RMSE + MAE
-- Baseline: `NormalPredictor` (random from training distribution)
-- SVD must beat baseline (assert SVD RMSE < NormalPredictor RMSE)
+- Single temporal split (cutoff 2011-10-01) — train on stable season, test on holiday spike
+- Warm-user RMSE: SVD 0.3776 vs global-mean baseline 0.3877 → **+2.6% lift**
+- All-user RMSE: SVD 0.3517 vs baseline 0.3593 → **+2.1% lift**
+- 71.8% test users seen in training (warm) — enables meaningful personalization
 
-**Top-N generation**: predict score for all unrated categories for a target customer → sort descending → top-5.
+**Top-N generation**: predict score for all un-purchased products → sort descending → top-5.
 
 ---
 
 ## Content-Based Filtering — Sentence Transformers + FAISS
 
-**Embedding model**: `paraphrase-multilingual-MiniLM-L12-v2`
-- 384-dimensional vectors
-- Handles Portuguese natively
-- ~471MB download, cached at `~/.cache/huggingface/`
+**Embedding model**: `all-MiniLM-L6-v2`  
+- 384-dimensional vectors (same as multilingual predecessor)
+- English-optimized (~2× faster than `paraphrase-multilingual-MiniLM-L12-v2`)
+- Cached at `data/cb_embeddings.npy` after first encode
 
-**Feature string per product** (built at preprocessing time):
+**Feature string per product**:
 ```python
-metadata = f"{product_category_name} {price_bucket} {weight_bucket}"
-# price_bucket: budget (<50R$) | mid (50-150R$) | premium (150-500R$) | luxury (500R$+)
-# weight_bucket: light (<500g) | medium (500-2000g) | heavy (2-10kg) | bulky (10kg+)
+metadata_str = f"{product_description} {price_bucket}"
+# price_bucket: budget (<£2) | low (£2-5) | mid (£5-20) | premium (£20+)
 ```
 
 **Index construction**:
@@ -97,54 +134,54 @@ index = faiss.IndexFlatIP(384)  # inner product on normalized = cosine similarit
 index.add(embeddings)
 ```
 
-**Query** (product similarity):
+**Customer profile for CB scoring**:
 ```python
-D, I = index.search(query_embedding, k=6)  # k+1 to skip self
+profile_emb = embeddings[purchased_product_indices].mean(axis=0)
+profile_emb /= np.linalg.norm(profile_emb) + 1e-9
+cb_score = candidate_embeddings @ profile_emb
 ```
 
-**Semantic search** (free-text):
-```python
-query_vec = model.encode(["presente leve para crianças"], normalize_embeddings=True)
-D, I = index.search(query_vec, k=5)
-```
+**Semantic coherence verification**: within-prefix cosine > cross-prefix cosine for all top-5 prefixes
+(SET, PINK, BLUE, RED, VINTAGE) — confirmed ✓ in notebook.
 
 ---
 
 ## Hybrid Combination
 
 ```python
-ALPHA = 0.6  # weight toward CF (user behavior over content metadata)
+ALPHA = 0.6  # weight toward CF (purchase history over content metadata)
 
 cf_score_normalized = (predicted_rating - 1) / 4  # map [1,5] → [0,1]
 cb_score = cosine_similarity                        # already in [0,1]
 
-hybrid_score = ALPHA * cf_score_normalized + (1 - ALPHA) * cb_score
+hybrid_score = ALPHA * cf_score_normalized + (1 - ALPHA) * max(cb_score, 0)
 ```
 
-α=0.6 justification: we have real purchase+review data, so user behavior signal is stronger than product metadata alone. For cold-start users (0 prior purchases), fall back to α=0 (pure CB).
+**α=0.6 justification**: purchase frequency is a direct behavioural signal (stronger than metadata);
+CB provides cold-start coverage and semantic diversity. Exclusion of already-purchased products
+ensures recommendations represent discovery.
 
 ---
 
 ## Research Questions
 
-### RQ1: Regional Rating Bias by Customer Type
-**Question**: Do multi-category buyers rate products differently by Brazilian region?
-**Multi-category flag**: customer bought from ≥2 distinct product categories.
-**Method**: Mann-Whitney U test (`scipy.stats.mannwhitneyu`) comparing review scores of multi-cat vs single-cat customers.
-**Visualization**: Violin plot — top-5 states by order volume, split by buyer_type.
+### RQ1: Do Loyal Customers Show Higher Per-Invoice Product Diversity?
+**Question**: Loyal customers have more invoices — but is their *per-invoice* product variety different?  
+**Metric**: `diversity_rate = n_distinct_products / invoice_count` (normalizes for exposure)  
+**Method**: Mann-Whitney U test (non-parametric, no normality assumption) on diversity_rate; violin plot.  
+**Segment**: Loyal (≥3 invoices, n=1,998) vs Occasional (1–2 invoices, n=2,336)  
+**Result**: U = 2,045,312, p = 2.2e-12 — highly significant difference.
 
-### RQ2: SVD vs Baseline Performance
-**Question**: How much does SVD improve over global-mean baseline?
-**Method**: Surprise 5-fold CV comparison (SVD vs NormalPredictor), RMSE + MAE table.
-**Extension**: Segment analysis by purchase frequency (1 order, 2–3, 4+) to surface cold-start limitations.
+### RQ2: Does SVD Outperform a Non-Personalized Baseline?
+**Question**: Can learned latent factors beat global-mean prediction for purchase frequency?  
+**Method**: Single temporal split (2011-10-01). SVD vs global-mean baseline. Warm-user filter.  
+**Result**: SVD +2.6% RMSE improvement for warm users — meaningful for implicit feedback at this sparsity.
 
-### RQ3: Semantic Recommendation Coherence
-**Question**: How coherent are sentence-transformer recommendations vs actual co-purchases?
-**Metric**: overlap@5 — for top-50 products by order volume, compute:
-```
-overlap@5 = |FAISS_top5 ∩ co_purchased_products| / 5
-```
-**Bonus**: Show free-text semantic search working (demonstrates vector DB value).
+### RQ3: CB Coherence + Hybrid Blending
+**RQ3a**: Do sentence-transformer embeddings capture meaningful product relationships?  
+→ Verified via within-prefix vs cross-prefix cosine similarity (5/5 prefixes ✓)  
+**RQ3b**: Does hybrid blend CF and CB signals?  
+→ CF vs CB Jaccard@5 = 0.00 (fully complementary); CB vs Hybrid = 0.37 (CB contributes to hybrid)
 
 ---
 
@@ -152,13 +189,14 @@ overlap@5 = |FAISS_top5 ∩ co_purchased_products| / 5
 
 | # | Viz Type | Variables | Library |
 |---|----------|-----------|---------|
-| 3.1 | Line chart | Monthly order count (time series) | matplotlib |
-| 3.2 | Horizontal bar | Top-15 categories by order count | matplotlib |
-| 3.3 | Histogram + KDE | review_score distribution | seaborn |
-| 3.4 | Box plot | payment_value grouped by review_score | seaborn |
-| 3.5 | Bar chart | Customer count by state | matplotlib |
+| 3.1 | Line chart | Monthly invoice volume over time | matplotlib |
+| 3.2 | Horizontal bar | Top-20 products by invoice count | matplotlib |
+| 3.3 | Bar chart | Top-10 countries by unique customers | matplotlib |
+| 3.4 | Histogram (log scale) | Purchase frequency per customer | matplotlib |
+| 3.5 | Histogram | Synthetic rating distribution preview | matplotlib |
+| 3.6 | Violin plot | Diversity rate: loyal vs occasional | seaborn |
 
-5 distinct types → satisfies assignment's 4+ requirement.
+6 distinct viz types → satisfies assignment's 4+ requirement.
 
 ---
 
@@ -169,39 +207,19 @@ pandas>=2.0
 numpy>=2.0
 matplotlib>=3.9
 seaborn>=0.13
-scikit-learn>=1.9       # train_test_split, preprocessing
 scipy>=1.18             # stats.mannwhitneyu
-scikit-surprise>=1.1    # SVD, NormalPredictor, Dataset, Reader, cross_validate
+scikit-surprise>=1.1    # SVD, Dataset, Reader, accuracy
 faiss-cpu>=1.14         # IndexFlatIP
 sentence-transformers>=3.0  # SentenceTransformer, encode
 ```
-
-Install:
-```bash
-uv pip install scikit-learn scipy matplotlib seaborn scikit-surprise faiss-cpu sentence-transformers \
-  --python /Users/ahmetbilalozgun/Documents/Projects/Dersler/veribilimi/.venv/bin/python3
-```
-
----
-
-## Code Conventions
-
-| Convention | Rule |
-|------------|------|
-| Random state | `RANDOM_STATE = 42`, used in every stochastic operation |
-| DataFrame names | `df_orders`, `df_items`, `df_products`, `df_customers`, `df_reviews`, `df_payments`, `df_master` |
-| Figures | `fig, ax = plt.subplots(...)` → `plt.tight_layout()` → `plt.show()` |
-| Notebook sections | Must match section outline in this doc |
-| Language | English code + variable names; Turkish/English markdown interpretations acceptable |
-| Git | Commit after each phase completes |
 
 ---
 
 ## Limitations (for report)
 
-1. **Cold-start**: customers with 0 prior orders → CF component unusable → pure CB fallback
-2. **Order sparsity**: ~90% of Olist customers have exactly 1 order → CF learns minimal personalization
-3. **Category-level resolution**: CF on categories not product_ids → coarse recommendations
-4. **Delivery filter**: only delivered orders → no signal from abandoned carts or returns
-5. **Embedding language**: product descriptions are Portuguese; model handles it but descriptions are short (metadata string only, not full description text)
-6. **No temporal dynamics**: model ignores when purchases happened (no recency weighting)
+1. **Implicit feedback**: purchase frequency ≠ preference; customers may buy items they return or dislike
+2. **UK concentration**: 91% UK customers → country-level analysis unreliable
+3. **B2B vs B2C mix**: UCI includes wholesale buyers (very high quantities) alongside retail — different behaviour patterns not distinguished
+4. **Cold-start (28%)**: test users not in training fall back to global mean for CF component
+5. **No temporal dynamics**: model ignores recency — recent purchases not weighted higher
+6. **Price_bucket only**: CB metadata is description + price bucket only; no image, size, category hierarchy

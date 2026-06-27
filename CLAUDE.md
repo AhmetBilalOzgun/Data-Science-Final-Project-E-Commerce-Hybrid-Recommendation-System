@@ -2,7 +2,7 @@
 
 ## Goal
 Data Science lecture final project (due 2026-07-03).
-Hybrid recommendation system on Olist Brazilian E-Commerce dataset.
+Hybrid recommendation system on UCI Online Retail dataset (implicit-purchase recommender).
 Theme: E-Commerce & Customer Behavior.
 
 ## Environment
@@ -10,40 +10,49 @@ Theme: E-Commerce & Customer Behavior.
 - Install packages: `uv pip install <pkg> --python /Users/ahmetbilalozgun/Documents/Projects/Dersler/veribilimi/.venv/bin/python3`
 - Run notebook: `/Users/ahmetbilalozgun/Documents/Projects/Dersler/veribilimi/.venv/bin/jupyter lab`
 
-## Dataset — Olist Brazilian E-Commerce (8 CSVs in `data/raw/`)
-| File | Key columns |
-|------|-------------|
-| olist_orders_dataset.csv | order_id, customer_id, order_status, order_purchase_timestamp |
-| olist_order_items_dataset.csv | order_id, product_id, price, freight_value |
-| olist_products_dataset.csv | product_id, product_category_name, product_description_lenght, product_weight_g |
-| olist_customers_dataset.csv | customer_id, customer_state, customer_zip_code_prefix |
-| olist_order_reviews_dataset.csv | order_id, review_score |
-| olist_order_payments_dataset.csv | order_id, payment_value |
-| olist_sellers_dataset.csv | seller_id, seller_state |
-| olist_geolocation_dataset.csv | geolocation_zip_code_prefix, geolocation_lat, geolocation_lng, geolocation_state |
+## Dataset — UCI Online Retail (single CSV `data/raw/Online_Retail.csv`)
+Source: https://archive.ics.uci.edu/dataset/352/online+retail  
+License: Open/Public (UCI Archive)
 
-**Filter**: `order_status == "delivered"` only.
+| Column | Role |
+|--------|------|
+| CustomerID | CF user axis (float64 → cast to int → str) |
+| StockCode | CF/CB item axis (filter: `^[0-9]{5}[A-Za-z]?$`) |
+| Description | CB metadata text (modal per StockCode) |
+| InvoiceDate | Temporal split axis (cutoff 2011-10-01) |
+| InvoiceNo | Purchase event; prefix 'C' = cancellation (drop) |
+| Quantity | Drop ≤ 0 |
+| UnitPrice | Drop ≤ 0; median per StockCode → price_bucket |
+| Country | EDA only |
+
+**Post-cleaning**: ~396k rows, 4,334 customers, 3,658 products, 18,401 invoices.
 
 ## Architecture
-1. **Collaborative Filtering**: scikit-surprise SVD on `customer_id × product_category_name` matrix (value = mean review_score)
-2. **Content-Based**: sentence-transformers (`paraphrase-multilingual-MiniLM-L12-v2`) → 384-dim embeddings → L2-normalize → FAISS IndexFlatIP
-3. **Hybrid**: `0.6 × CF_score_normalized + 0.4 × CB_cosine`
+1. **Collaborative Filtering**: scikit-surprise SVD on `customer_id × product_id` matrix  
+   Value = `log1p(InvoiceNo.nunique())` scaled to [1,5] **within each temporal window** (no leakage)
+2. **Content-Based**: sentence-transformers (`all-MiniLM-L6-v2`) → 384-dim embeddings → L2-normalize → FAISS IndexFlatIP  
+   Feature string: `f"{product_description} {price_bucket}"`
+3. **Hybrid**: `0.4 × CF_score_normalized + 0.6 × CB_cosine`; exclude already-purchased products
 
 ## Key Decisions (DO NOT CHANGE)
 - No ChromaDB (57-package dep tree)
 - No TF-IDF (replaced by semantic embeddings)
-- User-item matrix uses product_category_name (~70 categories), not product_id (too sparse)
+- Rating proxy = purchase frequency (log1p+minmax), NOT review scores
+- Synthetic rating computed per temporal window separately (no future leakage)
+- User-item matrix at product_id (StockCode) level, not category level
 - RANDOM_STATE = 42 everywhere
+- Temporal cutoff: `"2011-10-01"` (~80/20 train/test)
 
 ## Research Questions
-1. Do multi-category buyers rate differently by Brazilian region? (Mann-Whitney U + violin plot)
-2. How much does SVD improve over global-mean baseline? (5-fold CV, RMSE table)
-3. How coherent are semantic recommendations vs actual co-purchases? (FAISS top-5, overlap@5)
+1. Do loyal customers (≥3 invoices) show higher product diversity per invoice than occasional buyers? (Mann-Whitney U + violin, metric = diversity_rate = n_distinct_products / invoice_count)
+2. How much does SVD improve over global-mean baseline? (temporal split, RMSE table, warm-user focus)
+3. Are sentence-transformer embeddings semantically coherent? (FAISS top-5 prefix similarity check); does hybrid blend CF and CB signals? (Jaccard@5)
 
 ## Naming Conventions
-- DataFrames: `df_orders`, `df_items`, `df_products`, `df_customers`, `df_reviews`, `df_payments`, `df_master`
+- DataFrames: `df_raw`, `df`, `df_products`, `df_master`, `df_cb`, `df_loyalty`, `df_ui_train`, `df_ui_test`, `df_ui_all`
 - Figures: `fig, ax = plt.subplots(...)` → `plt.tight_layout()` → `plt.show()`
 - Random state: `RANDOM_STATE = 42` constant in setup cell
+- Embedding cache: `data/cb_embeddings.npy`
 
 ## File Structure
 ```
@@ -52,7 +61,8 @@ finalProject/
 ├── README.md
 ├── todos.md
 ├── design.md
-├── data/raw/           ← 8 Olist CSVs
+├── data/raw/           ← Online_Retail.csv (UCI)
+├── data/cb_embeddings.npy  ← cached sentence-transformer embeddings
 ├── notebook.ipynb      ← MAIN DELIVERABLE
 ├── report/             ← PDF report (3-5 pages)
 ├── prompts.md          ← prompt log (10-15 entries)
