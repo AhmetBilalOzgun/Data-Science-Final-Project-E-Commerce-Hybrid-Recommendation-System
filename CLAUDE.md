@@ -32,7 +32,7 @@ License: Open/Public (UCI Archive)
    Value = `log1p(InvoiceNo.nunique())` scaled to [1,5] **within each temporal window** (no leakage)
 2. **Content-Based**: sentence-transformers (`all-MiniLM-L6-v2`) → 384-dim embeddings → L2-normalize → FAISS IndexFlatIP  
    Feature string: `f"{product_description} {price_bucket}"`
-3. **Hybrid**: `0.4 × CF_score_normalized + 0.6 × CB_cosine`; exclude already-purchased products
+3. **Hybrid**: `0.6 × CF_score_normalized + 0.4 × CB_cosine`; exclude already-purchased products
 
 ## Key Decisions (DO NOT CHANGE)
 - No ChromaDB (57-package dep tree)
